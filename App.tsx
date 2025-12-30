@@ -10,19 +10,32 @@ import {
   BarChart3,
   Trophy,
   RefreshCcw,
-  Sparkles
+  Sparkles,
+  Settings
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Player, SessionConfig, Transaction } from './types';
 import { INITIAL_SESSION_CONFIG, DEFAULT_CHIPS } from './constants';
 import { simplifyDebts } from './utils/debtSimplifier';
 import { StatCard } from './components/StatCard';
+import { ConfigModal } from './components/ConfigModal';
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<SessionConfig>(INITIAL_SESSION_CONFIG);
   const [players, setPlayers] = useState<Player[]>([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [showSettlement, setShowSettlement] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(true);
+
+  // If we have saved data or players, we might not want to show it immediately, but for now
+  // let's assume "In the beginning" means on first load if default. 
+  // We can refine persistence later.
+  useEffect(() => {
+    // Basic check: if players exist, don't auto-open.
+    if (players.length > 0) {
+      setIsConfigOpen(false);
+    }
+  }, []);
 
   const addPlayer = () => {
     if (!newPlayerName.trim()) return;
@@ -104,20 +117,28 @@ const App: React.FC = () => {
             <div className="px-3 py-1 text-xs font-bold text-slate-400 uppercase tracking-tighter">Buy-in: ${config.buyInAmount}</div>
             <div className="px-3 py-1 text-xs font-bold text-slate-400 uppercase tracking-tighter">Points: {config.pointsPerBuyIn}</div>
             <button
-              onClick={() => {
-                const amount = prompt("Enter Buy-in Amount ($)", config.buyInAmount.toString());
-                const pts = prompt("Enter Points per Buy-in", config.pointsPerBuyIn.toString());
-                if (amount && pts) setConfig({ buyInAmount: Number(amount), pointsPerBuyIn: Number(pts) });
-              }}
+              onClick={() => setIsConfigOpen(true)}
               className="p-1.5 hover:bg-slate-700 rounded transition-colors"
             >
-              <RefreshCcw className="w-4 h-4 text-emerald-400" />
+              <Settings className="w-4 h-4 text-emerald-400" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <ConfigModal
+        isOpen={isConfigOpen}
+        onClose={() => setIsConfigOpen(false)}
+        config={config}
+        onSave={setConfig}
+        onReset={() => {
+          setPlayers([]);
+          setConfig(INITIAL_SESSION_CONFIG);
+        }}
+        isFirstRun={players.length === 0}
+      />
+
+      <main className="max-w-6xl mx-auto px-4 md:px-6 py-8">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard label="Total Pot" value={`$${totals.totalCash}`} icon={<CircleDollarSign className="w-4 h-4 text-emerald-500" />} />
@@ -135,19 +156,19 @@ const App: React.FC = () => {
           {/* Left Column: Player Management */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-              <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+              <div className="p-4 md:p-6 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Users className="w-5 h-5 text-emerald-400" />
                   Active Players
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <input
                     type="text"
                     value={newPlayerName}
                     onChange={(e) => setNewPlayerName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && addPlayer()}
                     placeholder="Player Name..."
-                    className="bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                    className="bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm flex-1 sm:flex-initial"
                   />
                   <button
                     onClick={addPlayer}
@@ -162,44 +183,46 @@ const App: React.FC = () => {
                 <table className="w-full text-left">
                   <thead className="bg-slate-800/30 text-slate-400 text-xs font-bold uppercase">
                     <tr>
-                      <th className="px-6 py-4">Player</th>
-                      <th className="px-6 py-4">Buy-ins ($)</th>
-                      <th className="px-6 py-4">Final Chips (Pts)</th>
-                      <th className="px-6 py-4">Net</th>
-                      <th className="px-6 py-4"></th>
+                      <th className="px-3 md:px-6 py-4">Player</th>
+                      <th className="px-3 md:px-6 py-4"># Buy-ins</th>
+                      <th className="px-3 md:px-6 py-4">Buy-ins ($)</th>
+                      <th className="px-3 md:px-6 py-4">Final Chips (Pts)</th>
+                      <th className="px-3 md:px-6 py-4">Net</th>
+                      <th className="px-3 md:px-6 py-4"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {players.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic">
+                        <td colSpan={6} className="px-3 md:px-6 py-12 text-center text-slate-500 italic">
                           No players added yet. Enter names above to start.
                         </td>
                       </tr>
                     )}
                     {totals.playerStats.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-800/20 transition-colors">
-                        <td className="px-6 py-4 font-semibold text-slate-200">{p.name}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
+                        <td className="px-3 md:px-6 py-4 font-semibold text-slate-200">{p.name}</td>
+                        <td className="px-3 md:px-6 py-4 font-bebas text-lg text-slate-300">{p.buyInCount}</td>
+                        <td className="px-3 md:px-6 py-4">
+                          <div className="flex items-center gap-2 md:gap-3">
                             <button onClick={() => updateBuyIn(p.id, -1)} className="text-slate-500 hover:text-rose-400"><MinusCircle className="w-5 h-5" /></button>
-                            <span className="w-12 text-center font-bebas text-lg">${p.cost}</span>
+                            <span className="w-8 md:w-12 text-center font-bebas text-lg">${p.cost}</span>
                             <button onClick={() => updateBuyIn(p.id, 1)} className="text-slate-500 hover:text-emerald-400"><PlusCircle className="w-5 h-5" /></button>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-4">
                           <input
                             type="number"
                             value={p.finalPoints || ''}
                             onChange={(e) => updatePoints(p.id, Number(e.target.value))}
                             placeholder="Points"
-                            className="bg-slate-800 border border-slate-700 px-3 py-1 rounded w-24 text-center text-sm focus:ring-1 focus:ring-emerald-500"
+                            className="bg-slate-800 border border-slate-700 px-2 md:px-3 py-1 rounded w-16 md:w-24 text-center text-sm focus:ring-1 focus:ring-emerald-500"
                           />
                         </td>
-                        <td className={`px-6 py-4 font-bebas text-xl ${p.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <td className={`px-3 md:px-6 py-4 font-bebas text-xl ${p.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {p.net >= 0 ? `+$${p.net.toFixed(2)}` : `-$${Math.abs(p.net).toFixed(2)}`}
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-3 md:px-6 py-4 text-right">
                           <button onClick={() => removePlayer(p.id)} className="text-slate-600 hover:text-rose-500 transition-colors">
                             <Trash2 className="w-5 h-5" />
                           </button>
@@ -230,18 +253,18 @@ const App: React.FC = () => {
               {totals.transactions.length > 0 ? (
                 <div className="space-y-4">
                   {totals.transactions.map((t, idx) => (
-                    <div key={idx} className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/50 flex items-center justify-between group hover:border-emerald-500/30 transition-all">
-                      <div className="flex flex-col">
+                    <div key={idx} className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/50 flex items-center justify-between group hover:border-emerald-500/30 transition-all gap-4">
+                      <div className="flex flex-col flex-1 min-w-0">
                         <span className="text-xs text-slate-500 font-bold uppercase mb-1">Payer</span>
-                        <span className="font-bold text-slate-200">{t.from}</span>
+                        <span className="font-bold text-slate-200 truncate">{t.from}</span>
                       </div>
-                      <div className="flex flex-col items-center">
+                      <div className="flex flex-col items-center shrink-0">
                         <div className="text-emerald-400 font-bebas text-2xl group-hover:scale-110 transition-transform">${t.amount}</div>
                         <div className="w-12 h-px bg-slate-700 my-1" />
                       </div>
-                      <div className="flex flex-col items-right text-right">
+                      <div className="flex flex-col items-end flex-1 min-w-0 text-right">
                         <span className="text-xs text-slate-500 font-bold uppercase mb-1">Receiver</span>
-                        <span className="font-bold text-slate-200">{t.to}</span>
+                        <span className="font-bold text-slate-200 truncate">{t.to}</span>
                       </div>
                     </div>
                   ))}
@@ -250,27 +273,6 @@ const App: React.FC = () => {
                 <div className="text-center py-12 text-slate-500">
                   <Receipt className="w-12 h-12 mx-auto mb-4 opacity-20" />
                   <p>Transactions will appear here once points are entered.</p>
-                </div>
-              )}
-
-              {/* Visualization */}
-              {players.length > 0 && (
-                <div className="mt-8 h-48 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={totals.playerStats}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }}
-                        cursor={{ fill: '#1e293b', opacity: 0.4 }}
-                      />
-                      <Bar dataKey="net">
-                        {totals.playerStats.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.net >= 0 ? '#10b981' : '#f43f5e'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
                 </div>
               )}
             </div>
